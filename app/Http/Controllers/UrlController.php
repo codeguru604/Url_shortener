@@ -6,7 +6,7 @@ use App\Models\Url;
 use Illuminate\Support\Str;
 use App\Http\Requests\StoreUrlRequest;
 use App\Http\Requests\UpdateUrlRequest;
-use GuzzleHttp\Client;
+use App\Helpers\Helper;
 
 class UrlController extends Controller
 {
@@ -38,36 +38,8 @@ class UrlController extends Controller
      */
     public function store(StoreUrlRequest $request)
     {
-        $client = new Client();
-        $apiKey = env('SAFE_BROWSING_API_KEY');
-        $clientId = env('SAFE_CLIENT_ID');
-        $shorten_url = substr(str_shuffle('abcdefghijklmnopqrstuvwxyz!@#$%^&*()-_=+[]{}|;:,.<>?'), 0, 6);
-        do {
-            $response = $client->post('https://safebrowsing.googleapis.com/v4/threatMatches:find?key=' . $apiKey, [
-                'json' => [
-                    'client' => [
-                        'clientId' => $clientId,
-                        'clientVersion' => '1.0.0',
-                    ],
-                    'threatInfo' => [
-                        'threatTypes' => ['MALWARE', 'SOCIAL_ENGINEERING'],
-                        'platformTypes' => ['WINDOWS'],
-                        'threatEntryTypes' => ['URL'],
-                        'threatEntries' => [
-                            ['url' => 'http://127.0.0.1:8000/visit/' . $shorten_url]
-                        ]
-                    ]
-                ]
-            ]);
-            $result = json_decode($response->getBody()->getContents(), true);
-            if (empty($result['matches'])) {
-                break;
-            } else {
-                $shorten_url = substr(str_shuffle('abcdefghijklmnopqrstuvwxyz!@#$%^&*()-_=+[]{}|;:,.<>?'), 0, 6);
-            }
-        } while (true);
-        
-        //
+        $helper = new Helper();
+        $shorten_url = $helper->getSafeBrowsingURI();
         $url = Url::create([
             'full_url' => $request->full_url,
             'url_desc' => $request->url_desc,
@@ -133,7 +105,8 @@ class UrlController extends Controller
         return response()->json('deleted');
     }
 
-    public function getUserLinks($user_id){
+    public function getUserLinks($user_id)
+    {
         return response()->json(Url::where('user_id', $user_id)->latest()->paginate(4));
     }
 }
